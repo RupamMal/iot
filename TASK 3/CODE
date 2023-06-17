@@ -1,0 +1,95 @@
+#include <ESP8266WiFi.h>
+#include <SPI.h>
+#include <Wire.h>
+ 
+String apiKey = "QV2ZIY14WGL7F6V3"; // Enter your Write API key from ThingSpeak
+const char *ssid =  "PRP108";        //Your Access Point or Personal Hotspot, cannot be longer than 32 characters!
+const char *pass =  "iotlab108";
+const char* server = "api.thingspeak.com";
+#define soilWet 500   // Define max value we consider soil 'wet'
+#define soilDry 750   // Define min value we consider soil 'dry'
+
+// Sensor pins
+#define sensorPower 14 //D5
+#define sensorPin A0
+WiFiClient client;
+
+void setup() {
+	pinMode(sensorPower, OUTPUT);
+	
+	// Initially keep the sensor OFF
+	digitalWrite(sensorPower, LOW);
+	
+	Serial.begin(115200);
+  Serial.println("Connecting to ");
+  Serial.println(ssid);
+  
+
+  
+  WiFi.begin(ssid, pass);
+ 
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+    Serial.println("");
+    Serial.println("WiFi connected");
+   
+    delay(4000);
+}
+
+void loop() {
+	//get the reading from the function below and print it
+	int moisture = readSensor();
+	Serial.print("Analog Output: ");
+	Serial.println(moisture);
+
+	// Determine status of our soil
+	if (moisture < soilWet) 
+  {
+		Serial.println("Status: Soil is too wet");
+	} else if (moisture >= soilWet && moisture < soilDry)
+   {
+		Serial.println("Status: Soil moisture is perfect");
+	 } else 
+   {
+		Serial.println("Status: Soil is too dry - time to water!");
+	 }
+	
+	delay(1000);	// Take a reading every second for testing
+					// Normally you should take reading perhaps once or twice a day
+	Serial.println();
+   if (client.connect(server, 80)) // "184.106.153.149" or api.thingspeak.com
+  {
+    String postStr = apiKey;
+    postStr += "&field1=";
+    postStr += String(moisture);
+    postStr += "r\n";
+    
+    client.print("POST /update HTTP/1.1\n");
+    client.print("Host: api.thingspeak.com\n");
+    client.print("Connection: close\n");
+    client.print("X-THINGSPEAKAPIKEY: " + apiKey + "\n");
+    client.print("Content-Type: application/x-www-form-urlencoded\n");
+    client.print("Content-Length: ");
+    client.print(postStr.length());
+    client.print("\n\n");
+    client.print(postStr);
+    
+    Serial.println("Data Send to Thingspeak");
+  }
+    client.stop();
+    Serial.println("Waiting...");
+ 
+    delay(2000);      // thingspeak needs minimum 15 sec delay between updates.
+}
+
+//  This function returns the analog soil moisture measurement
+int readSensor() {
+	digitalWrite(sensorPower, HIGH);	// Turn the sensor ON
+	delay(10);							// Allow power to settle
+	int val = analogRead(sensorPin);	// Read the analog value form sensor
+	digitalWrite(sensorPower, LOW);		// Turn the sensor OFF
+	return val;							// Return analog moisture value
+}
