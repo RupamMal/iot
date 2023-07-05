@@ -1,0 +1,68 @@
+#include <Adafruit_BMP085.h>
+#include <Wire.h>
+#include <ESP8266WiFi.h>
+#define seaLevelPressure_hPa 1013.25
+
+Adafruit_BMP085 bmp;
+WiFiClient client;
+
+String apiKey = "LHDNDDWGFELMY6PW";
+const char* ssid =  "PRP108";
+const char* pass =  "iotlab108";
+const char* server = "api.thingspeak.com";
+
+void setup() {
+  Serial.begin(9600);
+  if (!bmp.begin()) {
+	Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+	while (1) {}
+  }
+  WiFi.begin(ssid,pass);
+  while (WiFi.status() != WL_CONNECTED) 
+  {
+        delay(500);
+        Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+}
+  
+void loop() {
+   if (client.connect(server,80)){
+          
+    Serial.print("Temperature = ");
+    float temp=bmp.readTemperature();
+    Serial.print(bmp.readTemperature());
+    Serial.println(" *C");
+    
+    Serial.print("Pressure = ");
+    float pres=bmp.readPressure();
+    Serial.print(bmp.readPressure());
+    Serial.println(" Pa");
+
+    Serial.print("Altitude = ");
+    float Altitud=bmp.readAltitude();
+    Serial.print(bmp.readAltitude());
+    Serial.println(" meters");
+
+    Serial.print("Pressure at sealevel (calculated) = ");
+    float sea=bmp.readSealevelPressure();
+    Serial.print(bmp.readSealevelPressure());
+    Serial.println(" Pa");
+    
+    Serial.println();
+
+    String sendData=apiKey+"&field1="+String(temp)+"&field2="+String(pres)+"&field3="+String(Altitud)+"&field4="+String(sea)+"\r\n\r\n";
+    client.print("POST /update HTTP/1.1\n");
+    client.print("Host: api.thingspeak.com\n");
+    client.print("Connection: close\n");
+    client.print("X-THINGSPEAKAPIKEY: "+apiKey+"\n");
+    client.print("Content-Type: application/x-www-form-urlencoded\n");
+    client.print("Content-Length: ");
+    client.print(sendData.length());
+    client.print("\n\n");
+    client.print(sendData);
+    }
+    client.stop();
+    delay(1000);
+}
